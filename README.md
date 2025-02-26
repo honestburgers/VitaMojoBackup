@@ -1,25 +1,29 @@
+Sure! Here’s the README in raw Markdown format:
+
 # VitaMojoBackup
 
-A PowerShell script for backing up transactional and non-transactional data from the Vita Mojo reporting API. It exports data incrementally, ensuring that only new or updated records are retrieved and stored efficiently.
+A PowerShell script for backing up transactional and non-transactional data from the **Vita Mojo** reporting API. It exports data incrementally, ensuring that only new or updated records are retrieved and stored efficiently.
 
-Features
+## Features
 
-✅ Authenticates with the Vita Mojo API using email and password
-✅ Exports both transactional and non-transactional data
-✅ Supports incremental backups for transactional data
-✅ Handles large data sets with pagination
-✅ Saves backup files in JSON format
-✅ Supports scheduled execution for automated backups
+✅ Authenticates with the Vita Mojo API using email and password  
+✅ Exports both transactional and non-transactional data  
+✅ Supports incremental backups for transactional data  
+✅ Handles large data sets with pagination  
+✅ Saves backup files in JSON format  
+✅ Supports scheduled execution for automated backups  
 
-Prerequisites
-	•	PowerShell 5.1+ (or PowerShell Core for cross-platform support)
-	•	A Vita Mojo account with API access
-	•	Sufficient storage space for backup files
+## Prerequisites
 
-Installation
+- **PowerShell 5.1+** (or PowerShell Core for cross-platform support)  
+- A **Vita Mojo** account with API access  
+- Sufficient storage space for backup files  
+
+## Installation
 
 Clone the repository or download the script:
 
+```sh
 git clone https://github.com/The-Kitchen-Sync/VitaMojoBackup.git
 cd VitaMojoBackup
 
@@ -106,4 +110,4 @@ Support
 
 For issues or questions, please open an Issue in the repository or contact the maintainers.
 
-Would you like any refinements, such as additional error-handling details or setup instructions?
+You can copy and paste this directly into your `README.md` file. Let me know if you'd like any modifications!
