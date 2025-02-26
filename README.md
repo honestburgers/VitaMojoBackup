@@ -1,6 +1,4 @@
-Here’s a README tailored specifically for your VitaMojoBackup PowerShell script:
-
-VitaMojoBackup
+# VitaMojoBackup
 
 A PowerShell script for backing up transactional and non-transactional data from the Vita Mojo reporting API. It exports data incrementally, ensuring that only new or updated records are retrieved and stored efficiently.
 
