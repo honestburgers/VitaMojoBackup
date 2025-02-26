@@ -53,10 +53,10 @@ Example:
 	- Defines whether each cube is transactional (exported incrementally) or static.
 3. Data Export
 	- For transactional cubes:
-	- Only exports new/updated records since the last backup.
-	- Stores the latest timestamp in a latest-data-date-time.txt file for future runs.
+	  - Only exports new/updated records since the last backup.
+	  - Stores the latest timestamp in a latest-data-date-time.txt file for future runs.
 	- For non-transactional cubes:
-	- Fetches all data in full each time.
+	  - Fetches all data in full each time.
 4. Data Storage
 	- Saves each data export as a JSON file in Output/{CubeName}/.
 	- Transactional exports are split into numbered files.
