@@ -23,7 +23,6 @@ A PowerShell script for backing up transactional and non-transactional data from
 
 Clone the repository or download the script:
 
-```sh
 git clone https://github.com/The-Kitchen-Sync/VitaMojoBackup.git
 cd VitaMojoBackup
 
