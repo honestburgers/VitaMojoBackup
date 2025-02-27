@@ -156,7 +156,12 @@ $MetaResponse.cubes | ForEach-Object {
             $LatestDataDateTime = $IncrementalBackupFromDateTime
         }        
         
-        $UpdatedAtFieldName = "$($CubeName).updatedAt"
+        if ($CubeName -eq "CashManagement") {
+            $UpdatedAtFieldName = "$($CubeName).updated_at"
+        }
+        else {
+            $UpdatedAtFieldName = "$($CubeName).updatedAt"
+        }
 
         # Tell the query to order by the updated at field. The order isn't that important but not specifying one causes issues with paged results.
         $Order = @{                     
