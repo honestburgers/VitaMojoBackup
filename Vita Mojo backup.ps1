@@ -1,30 +1,38 @@
 param (
     [Parameter(Mandatory)]
     [string]
-    $Email,
+    $VitaMojoUsername,
     [Parameter(Mandatory)]
     [string]
-    $Password,
+    $VitaMojoPassword,    
+    [Parameter(Mandatory)]
     [string]
-    $FallbackExportFromDateTime = "2025-02-26T16:25:00"
+    $AzureTenantID,
+    [Parameter(Mandatory)]
+    [string]
+    $AzureServicePrincipalID,
+    [Parameter(Mandatory)]
+    [string]
+    $AzureServicePrincipalSecret,
+    [Parameter(Mandatory)]
+    [string]
+    $AzureResourceGroupName,
+    [Parameter(Mandatory)]
+    [string]
+    $AzureStorageAccountName,    
+    [string]
+    $SelectedCubeName,
+    [string]
+    $IncrementalBackupFromDateTime = "2025-01-01T00:00:00"    
 )
 
 function Get-VitaMojoAuthenticationToken {
-    param (
-        [Parameter(Mandatory)]
-        [string]
-        $Email,
-        [Parameter(Mandatory)]
-        [string]
-        $Password
-    )
-
     $Uri = "https://vmos2.vmos.io/user/v1/auth"
     $Method = "Post"
     $ContentType = "application/json"
     $Body = @{
-        "email" = $Email
-        "password" = $Password
+        "email" = $VitaMojoUsername
+        "password" = $VitaMojoPassword
     } | ConvertTo-Json
 
     $TokenResponse = Invoke-RestMethod -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body
@@ -45,11 +53,54 @@ function Invoke-VitaMojoAPIRequest {
        
     $Uri = "https://reporting.data.vmos.io/cubejs-api/v1/$($EndpointName)"
     $Headers = @{
-        'Authorization' = Get-VitaMojoAuthenticationToken -Email $Email -Password $Password
+        'Authorization' = Get-VitaMojoAuthenticationToken
     }
     $ContentType = "application/json"
 
     Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body
+}
+
+function Set-AzureStorageConnection {
+
+    # Connect to Azure as the service principal.
+    $AzureServicePrincipalSecretSecureString = $AzureServicePrincipalSecret | ConvertTo-SecureString -AsPlainText -Force
+    $AzureServicePrincipalCredential = New-Object -TypeName PSCredential -ArgumentList $AzureServicePrincipalID, $AzureServicePrincipalSecretSecureString
+    Connect-AzAccount -ServicePrincipal -Credential $AzureServicePrincipalCredential -Tenant $AzureTenantID
+
+    # Get the Azure storage account.
+    $AzureStorageAccountContext = (Get-AzStorageAccount -ResourceGroupName $AzureResourceGroupName -AccountName $AzureStorageAccountName).Context
+
+    # Get the Azure storage account container.
+    Get-AzStorageContainer -Context $AzureStorageAccountContext -Name $AzureStorageContainerName
+
+    # If the Azure storage account container does not exist, create it.
+    if ($? -eq $false) {
+        New-AzStorageContainer -Name vitamojo -Context $AzureStorageAccountContext    
+    }
+
+    # Login with the azcopy utility.
+    $env:AZCOPY_SPA_CLIENT_SECRET = $AzureServicePrincipalSecret
+    ./azcopy login --service-principal --application-id $AzureServicePrincipalID --tenant-id=$AzureTenantID
+}
+
+function Copy-ToAzureStorage {
+    param (
+        [Parameter(Mandatory)]
+        [string]
+        $SourceFilename,        
+        [Parameter(Mandatory)]
+        [string]
+        $FolderName,
+        [Parameter(Mandatory)]
+        [string]
+        $Filename        
+    )                    
+    
+    # Copy the file to the Azure storage container.
+    $DestinationFilePath = "$AzureStorageContainerName/$FolderName/$Filename"
+    ./azcopy copy $SourceFilename "https://$AzureStorageAccountName.blob.core.windows.net/$DestinationFilePath"
+
+    Write-Host "Data written to Azure blob storage $DestinationFilePath"                    
 }
 
 # The list of cubes that hold transactional data and so will be exported incrementally.
@@ -60,19 +111,22 @@ $TransactionalDataCubeNames = @(
     "ReconciliationReports"
 )
 
+$AzureStorageContainerName = "vitamojo"
+
 # The maximum number of records to return from each request to the Vita Mojo API.
 $PageSize = 10000
 
 # Get the cubes metadata
-$MetaResponse = Invoke-VitaMojoAPIRequest -EndpointName "meta" -Method "Get"    
+$MetaResponse = Invoke-VitaMojoAPIRequest -EndpointName "meta" -Method "Get"  
+
+Set-AzureStorageConnection
 
 # Loop through each cube and export the data.
 $MetaResponse.cubes | ForEach-Object {
     $CubeName = $_.name
     Write-Host "Exporting cube $($CubeName)"    
-
-    # For debugging only
-    If ($CubeName -ne "Stores") {
+    
+    If (($SelectedCubeName -ne "") -and ($CubeName -ne $SelectedCubeName)) {
         return
     }
 
@@ -82,7 +136,7 @@ $MetaResponse.cubes | ForEach-Object {
     $OutputFolder = "Output/$($CubeName)"
 
     # Ensure the output folder exists.
-    New-Item -Path $OutputFolder -Type Directory -Force > $null
+    New-Item -Path $OutputFolder -Type Directory -Force
 
     # Get a list of all of the cube's dimensions.
     $Dimensions = @($_ | ForEach-Object {
@@ -99,7 +153,7 @@ $MetaResponse.cubes | ForEach-Object {
             $LatestDataDateTime = Get-Content -Path $LatestDataDateTimeFilename -First 1       
         }
         Else {
-            $LatestDataDateTime = $ExportStartDateTime
+            $LatestDataDateTime = $IncrementalBackupFromDateTime
         }        
         
         $UpdatedAtFieldName = "$($CubeName).updatedAt"
@@ -158,7 +212,7 @@ $MetaResponse.cubes | ForEach-Object {
                 
         If ($IsTransactionalDataCube) {            
 
-            # Get the latest file index by enumerating the existing files.
+            # Get the latest file index by enumerating the existing files, defaulting to 1 if no file exists.
             $OutputFileLatestIndex = [int](Get-ChildItem -Path $OutputFolder -Filter "*.json" |
                 ForEach-Object { [int]($_.BaseName) } |
                 Measure-Object -Maximum |
@@ -174,22 +228,23 @@ $MetaResponse.cubes | ForEach-Object {
         If ($LoadResponse.data.Count -gt 0) {
 
             # Get the filename in which to store the exported data.
-            $OutputFilename = "$($OutputFolder)/$('{0:d7}' -f ($OutputFileLatestIndex + 1)).json"
+            $OutputFilename = "$('{0:d7}' -f ($OutputFileLatestIndex + 1)).json"
+            $OutputFilenameWithPath = "$($OutputFolder)/$($OutputFilename)"
 
             # Write the data to the file.
-            $LoadResponse | ConvertTo-Json -Depth 100 | Out-File $OutputFilename
+            $LoadResponse | ConvertTo-Json -Depth 100 | Out-File $OutputFilenameWithPath
 
             If ($IsTransactionalDataCube) {
 
                 # Get the updated date/time of the latest data.
                 $LastLoadedDateTime = $LoadResponse.data | Measure-Object -Property $UpdatedAtFieldName -Maximum | Select-Object -ExpandProperty Maximum            
-            }
+            }            
 
-            Write-Host "Data written to $($OutputFilename)"
+            Copy-ToAzureStorage -SourceFilename $OutputFilenameWithPath -FolderName $CubeName -Filename $OutputFilename
         }        
         
-        $PageIndex = $PageIndex + 1            
-    } While ($LoadResponse.data.Count -eq $PageSize)        
+        $PageIndex = $PageIndex + 1                
+    } While ($LoadResponse.data.Count -eq $PageSize -and $PageIndex -lt 3)        
 
     # Write the updated date/time of the latest data to file.
     If ($IsTransactionalDataCube) {

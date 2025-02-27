@@ -1,21 +1,23 @@
 # Vita Mojo backup script
 
-A PowerShell script for backing up data from the **Vita Mojo** reporting API. It exports data incrementally, ensuring that only new or updated records are retrieved and stored efficiently.
+A PowerShell script for backing up data from the **Vita Mojo** reporting API and uploading it to an **Azure** storage account blob.
 
 ## Features
 
-✅ Authenticates with the Vita Mojo API using email and password  
-✅ Exports both transactional and non-transactional data  
+✅ Authenticates with the **Vita Mojo** API using username and password  
+✅ Backs up both transactional and non-transactional data  
 ✅ Supports incremental backups for transactional data  
 ✅ Handles large data sets with pagination  
-✅ Saves backup files in JSON format  
+✅ Saves backup files in JSON format in Microsoft **Azure**  
 ✅ Supports scheduled execution for automated backups  
 
 ## Prerequisites
 
 - **PowerShell 5.1+** (or PowerShell Core for cross-platform support)  
-- A **Vita Mojo** account with API access  
-- Sufficient storage space for backup files  
+- **Azure Powershell module** [more details...](https://learn.microsoft.com/en-us/powershell/azure/install-azure-powershell?view=azps-13.2.0)
+- **Azcopy** installed in the script directory [more details...](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-v10?tabs=dnf)
+- A **Vita Mojo** account with API access
+- An **Azure** account with a storage account and a service principal that has write access
 
 ## Installation
 
@@ -31,26 +33,55 @@ cd VitaMojoBackup
 Run the script manually using PowerShell:
 
 ```
-.\VitaMojoBackup.ps1 -Email "your-email@example.com" -Password "your-password"
+.\VitaMojoBackup.ps1 ` 
+  -VitaMojoUsername "your-username" `
+  -VitaMojoPassword "your-password" `
+  -AzureTenantID "your-tenant-id" `
+  -AzureServicePrincipalID "your-service-principal-id" `
+  -AzureServicePrincipalSecret "your-service-principal-secret" `
+  -AzureResourceGroupName "your-resource-group-name" `
+  -AzureStorageAccountName "your-storage-account-name"
 ```
 
 ## Optional Parameters
 
-- -FallbackExportFromDateTime:
-If no previous backup is found, this sets the default date-time for incremental exports.
-Example:
+- **-IncrementalBackupFromDateTime**: If no previous backup is found, this sets the start date/time for incremental backups. Must be specified in yyyy-MM-ddTHH:mm:ss format.
 
+Example:
 ```
-.\VitaMojoBackup.ps1 -Email “your-email@example.com” -Password “your-password” -FallbackExportFromDateTime “2025-02-26T16:25:00”
+.\VitaMojoBackup.ps1 ` 
+  -VitaMojoUsername "your-username" `
+  -VitaMojoPassword "your-password" `
+  -AzureTenantID "your-tenant-id" `
+  -AzureServicePrincipalID "your-service-principal-id" `
+  -AzureServicePrincipalSecret "your-service-principal-secret" `
+  -AzureResourceGroupName "your-resource-group-name" `
+  -AzureStorageAccountName "your-storage-account-name" `
+  -IncrementalBackupFromDateTime “2025-02-26T03:00:00”
+```
+
+- **-SelectedCubeName**: Only backs up the selected cube.
+
+Example:
+```
+.\VitaMojoBackup.ps1 ` 
+  -VitaMojoUsername "your-username" `
+  -VitaMojoPassword "your-password" `
+  -AzureTenantID "your-tenant-id" `
+  -AzureServicePrincipalID "your-service-principal-id" `
+  -AzureServicePrincipalSecret "your-service-principal-secret" `
+  -AzureResourceGroupName "your-resource-group-name" `
+  -AzureStorageAccountName "your-storage-account-name" `
+  -SelectedCubeName “cube-name”
 ```
 
 ## How It Works
 
-1. Authentication
-	- The script obtains an authentication token from Vita Mojo.
+1. **Vita Mojo** Authentication
+	- The script obtains an authentication token from **Vita Mojo** using the username and password supplied.
 2. Retrieve Cube Metadata
-	- Fetches the list of available data “cubes” (tables).
-	- Defines whether each cube is transactional (exported incrementally) or static.
+	- Fetches the list of available data cubes from the **Vita Mojo** API.
+	- Defines whether each cube is transactional (backed up incrementally) or static.
 3. Data Export
 	- For transactional cubes:
 	  - Only exports new/updated records since the last backup.
@@ -58,39 +89,18 @@ Example:
 	- For non-transactional cubes:
 	  - Fetches all data in full each time.
 4. Data Storage
-	- Saves each data export as a JSON file in Output/{CubeName}/.
+	- Uploads each backup file as a JSON file to the **Azure** blob container selected.	
 	- Transactional exports are split into numbered files.
 
 ## Example Output Structure
 
-/Output
-    /CashManagement
-        0000001.json
-        latest-data-date-time.txt
-    /OrderItems
-        0000001.json
-        0000002.json
-        latest-data-date-time.txt
-    /Stores
-        0000001.json
-
-## Automating the Backup Process
-
-To schedule automatic backups, use Task Scheduler (Windows) or cron jobs (Linux/macOS).
-
-Windows Task Scheduler Setup
-	
-1. Open Task Scheduler → “Create Basic Task”.
-2. Set a schedule (e.g., daily at midnight).
-3. Choose “Start a Program” and set the action to:
-
-```
-powershell.exe -ExecutionPolicy Bypass -File “C:\Path\To\VitaMojoBackup.ps1” -Email “your-email@example.com” -Password “your-password”
-```
-
-4. Save and enable the task.
-
-## Logging & Debugging
-
-- The script uses Write-Host to output progress messages.
-- Check for any authentication errors or API rate limits if data is missing.
+* /Output  
+  * /CashManagement  
+    * 0000001.json  
+    * latest-data-date-time.txt  
+  * /OrderItems  
+    * 0000001.json  
+    * 0000002.json  
+    * latest-data-date-time.txt  
+  * /Stores  
+    * 0000001.json
