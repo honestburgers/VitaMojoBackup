@@ -1,29 +1,8 @@
-param (
-    [Parameter(Mandatory)]
-    [string]
-    $VitaMojoUsername,
-    [Parameter(Mandatory)]
-    [string]
-    $VitaMojoPassword,    
-    [Parameter(Mandatory)]
-    [string]
-    $AzureTenantID,
-    [Parameter(Mandatory)]
-    [string]
-    $AzureServicePrincipalID,
-    [Parameter(Mandatory)]
-    [string]
-    $AzureServicePrincipalSecret,
-    [Parameter(Mandatory)]
-    [string]
-    $AzureResourceGroupName,
-    [Parameter(Mandatory)]
-    [string]
-    $AzureStorageAccountName,    
+param (    
     [string]
     $SelectedCubeName,
     [string]
-    $IncrementalBackupFromDateTime = "2025-01-01T00:00:00"    
+    $IncrementalBackupFromDateTime = "2025-02-28T03:00:00"    
 )
 
 function Get-VitaMojoAuthenticationToken {
@@ -33,6 +12,8 @@ function Get-VitaMojoAuthenticationToken {
     $Body = @{
         "email" = $VitaMojoUsername
         "password" = $VitaMojoPassword
+        "x-reporting-key" = $VitaMojoReportingKey
+        "x-requested-from" = "management"
     } | ConvertTo-Json
        
     $TokenResponse = Invoke-APIRequest -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body
@@ -95,7 +76,8 @@ function Invoke-VitaMojoAPIRequest {
        
     $Uri = "https://reporting.data.vmos.io/cubejs-api/v1/$($EndpointName)"
     $Headers = @{
-        'Authorization' = Get-VitaMojoAuthenticationToken
+        "Authorization" = Get-VitaMojoAuthenticationToken
+        "x-reporting-key" = $VitaMojoReportingKey
     }
     $ContentType = "application/json"
 
@@ -107,7 +89,7 @@ function Set-AzureStorageConnection {
     # Connect to Azure as the service principal.
     $AzureServicePrincipalSecretSecureString = $AzureServicePrincipalSecret | ConvertTo-SecureString -AsPlainText -Force
     $AzureServicePrincipalCredential = New-Object -TypeName PSCredential -ArgumentList $AzureServicePrincipalID, $AzureServicePrincipalSecretSecureString
-    Connect-AzAccount -ServicePrincipal -Credential $AzureServicePrincipalCredential -Tenant $AzureTenantID
+    Connect-AzAccount -ServicePrincipal -Credential $AzureServicePrincipalCredential -Tenant $AzureTenantID -SubscriptionId $AzureSubscriptionID
 
     # Get the Azure storage account.
     $AzureStorageAccountContext = (Get-AzStorageAccount -ResourceGroupName $AzureResourceGroupName -AccountName $AzureStorageAccountName).Context
@@ -119,10 +101,8 @@ function Set-AzureStorageConnection {
     if ($? -eq $false) {
         New-AzStorageContainer -Name vitamojo -Context $AzureStorageAccountContext    
     }
-
-    # Login with the azcopy utility.
-    $env:AZCOPY_SPA_CLIENT_SECRET = $AzureServicePrincipalSecret
-    ./azcopy login --service-principal --application-id $AzureServicePrincipalID --tenant-id=$AzureTenantID
+    
+    New-AzStorageContainerSASToken -Context $AzureStorageAccountContext -Name $AzureStorageContainerName -Permission racwdl    
 }
 
 function Copy-ToAzureStorage {
@@ -139,8 +119,9 @@ function Copy-ToAzureStorage {
     )                    
     
     # Copy the file to the Azure storage container.
-    $DestinationFilePath = "$AzureStorageContainerName/$FolderName/$Filename"
-    ./azcopy copy $SourceFilename "https://$AzureStorageAccountName.blob.core.windows.net/$DestinationFilePath"
+    $DestinationFilePath = "$AzureStorageContainerName/$FolderName"
+    $SASTokenValue = $SASToken[2]
+    & ./azcopy copy $SourceFilename "https://honestarchive.blob.core.windows.net/$DestinationFilePath/?$SASTokenVaLue"    
 
     Write-Host "Data written to Azure blob storage $DestinationFilePath"                    
 }
@@ -153,6 +134,15 @@ $TransactionalDataCubeNames = @(
     "ReconciliationReports"
 )
 
+$VitaMojoUsername = $Env:vitamojousername
+$VitaMojoPassword = $Env:vitamojopassword
+$VitaMojoReportingKey = $env:vitamojoreportingkey
+$AzureSubscriptionID = $Env:azuresubscriptionid
+$AzureTenantID = $Env:azuretenantid
+$AzureServicePrincipalID = $Env:azureserviceprincipalid
+$AzureServicePrincipalSecret = $Env:azureserviceprincipalsecret
+$AzureResourceGroupName = $Env:azureresourcegroupname
+$AzureStorageAccountName = $Env:azurestorageaccountname
 $AzureStorageContainerName = "vitamojo"
 
 # The maximum number of records to return from each request to the Vita Mojo API.
@@ -161,7 +151,7 @@ $PageSize = 10000
 # Get the cubes metadata
 $MetaResponse = Invoke-VitaMojoAPIRequest -EndpointName "meta" -Method "Get"  
 
-Set-AzureStorageConnection
+$SASToken = Set-AzureStorageConnection
 
 # Loop through each cube and export the data.
 $MetaResponse.cubes | ForEach-Object {
