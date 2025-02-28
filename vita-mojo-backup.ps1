@@ -50,12 +50,16 @@ function Invoke-APIRequest {
             $Response = Invoke-RestMethod -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body -StatusCodeVariable "ResponseStatusCode" -SkipHttpErrorCheck
         }
 
+        If ($ResponseStatusCode -ge 400) {            
+            Write-Error "API call to $Uri failed. $ResponseStatusCode : $($Response.message)"    
+        }        
+
         $InvokeAttempts = $InvokeAttempts + 1
     }
     While ($ResponseStatusCode -ge 500 -and $InvokeAttempts -lt 5)
 
     If ($InvokeAttempts -eq 5) {
-        Write-Error "API call to $Uri failed. Exiting..."
+        Write-Error "API call to $Uri failed 5 times. Exiting..."
         exit 1
     }
 
