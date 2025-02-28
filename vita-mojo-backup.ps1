@@ -34,9 +34,51 @@ function Get-VitaMojoAuthenticationToken {
         "email" = $VitaMojoUsername
         "password" = $VitaMojoPassword
     } | ConvertTo-Json
-
-    $TokenResponse = Invoke-RestMethod -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body
+       
+    $TokenResponse = Invoke-APIRequest -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body
     $TokenResponse.payload.token.value
+}
+
+function Invoke-APIRequest {
+    param (
+        [Parameter(Mandatory)]
+        [string]
+        $Uri,
+        [Parameter(Mandatory)]
+        [string]
+        $Method,                
+        $Headers,      
+        [string]
+        $ContentType,
+        [string]
+        $Body
+    )
+
+    $InvokeAttempts = 0
+
+    Do {
+        If ($InvokeAttempts -gt 0) {            
+            Start-Sleep -Seconds 5
+            Write-Host "Retrying API call to $URI"
+        }
+
+        if ($Headers) {
+            $Response = Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body -StatusCodeVariable "ResponseStatusCode" -SkipHttpErrorCheck
+        }
+        else {
+            $Response = Invoke-RestMethod -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body -StatusCodeVariable "ResponseStatusCode" -SkipHttpErrorCheck
+        }
+
+        $InvokeAttempts = $InvokeAttempts + 1
+    }
+    While ($ResponseStatusCode -ge 500 -and $InvokeAttempts -lt 5)
+
+    If ($InvokeAttempts -eq 5) {
+        Write-Error "API call to $Uri failed. Exiting..."
+        exit 1
+    }
+
+    return $Response
 }
 
 function Invoke-VitaMojoAPIRequest {
@@ -57,7 +99,7 @@ function Invoke-VitaMojoAPIRequest {
     }
     $ContentType = "application/json"
 
-    Invoke-RestMethod -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body
+    Invoke-APIRequest -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body    
 }
 
 function Set-AzureStorageConnection {
