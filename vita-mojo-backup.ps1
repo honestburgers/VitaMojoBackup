@@ -51,7 +51,7 @@ function Invoke-APIRequest {
         }
 
         If ($ResponseStatusCode -ge 400) {            
-            Write-Error "API call to $Uri failed. $ResponseStatusCode : $($Response.message)"    
+            Write-Host "API call to $Uri failed. $ResponseStatusCode : $($Response.message)"    
         }        
 
         $InvokeAttempts = $InvokeAttempts + 1
@@ -59,7 +59,7 @@ function Invoke-APIRequest {
     While ($ResponseStatusCode -ge 500 -and $InvokeAttempts -lt 5)
 
     If ($InvokeAttempts -eq 5) {
-        Write-Error "API call to $Uri failed 5 times. Exiting..."
+        Write-Host "API call to $Uri failed 5 times. Exiting..."
         exit 1
     }
 
@@ -172,7 +172,9 @@ $MetaResponse.cubes | ForEach-Object {
     $OutputFolder = "Output/$($CubeName)"
 
     # Ensure the output folder exists.
-    New-Item -Path $OutputFolder -Type Directory -Force
+    If (-Not (Test-Path -Path $OutputFolder)) {
+        New-Item -Path $OutputFolder -Type Directory
+    }
 
     # Get a list of all of the cube's dimensions.
     $Dimensions = @($_ | ForEach-Object {
