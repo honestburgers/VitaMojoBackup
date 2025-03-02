@@ -292,5 +292,6 @@ $MetaResponse.cubes | ForEach-Object {
     # Write the updated date/time of the latest data to file.
     If ($IsTransactionalDataCube) {
         $LastLoadedDateTime.ToString("yyyy-MM-ddTHH:mm:ss") | Out-File -Path $LatestDataDateTimeFilename
+        Copy-ToAzureStorage -SourceFilename $LatestDataDateTimeFilename -FolderName $CubeName -Filename "latest-data-date-time.txt"
     }
 }
