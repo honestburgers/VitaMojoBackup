@@ -1,4 +1,5 @@
 .vscode/
 output/
 azcopy*
-Deploy docker image.ps1
+deploy-docker-image.ps1
+debug-wrapper.ps1
