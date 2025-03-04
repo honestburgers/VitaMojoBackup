@@ -137,8 +137,15 @@ function Get-AzureStorageContainerSASToken {
         [Parameter(Mandatory)][string] $ContainerName        
     )
 
+    if ($script:AzureStorageContainerSASToken -and (Get-Date -AsUTC) -lt ($script:AzureStorageContainerSASTokenExpiryTime).AddMinutes(-2)) {
+        return $AzureStorageContainerSASToken
+    }
+
+    $script:AzureStorageContainerSASTokenExpiryTime = (Get-Date -AsUTC).AddMinutes(30)
+
     # Create a SAS token to use for uploading backup data to the container.
-    return New-AzStorageContainerSASToken -Context $Context -Name $ContainerName -Permission racwdl
+    $script:AzureStorageContainerSASToken = New-AzStorageContainerSASToken -Context $Context -Name $ContainerName -Permission racwdl -ExpiryTime $script:AzureStorageContainerSASTokenExpiryTime
+    return $script:AzureStorageContainerSASToken
 }
 
 function Get-CubeDimensions {
