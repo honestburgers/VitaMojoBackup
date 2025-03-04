@@ -5,20 +5,43 @@ param (
     $IncrementalBackupFromDate = "2025-03-02"    
 )
 
-function Get-VitaMojoAuthenticationToken {        
-    $Uri = "https://vmos2.vmos.io/user/v1/auth"
-    $Method = "Post"
-    $ContentType = "application/json"
-    $Body = @{
-        "email" = $Env:vitamojousername
-        "password" = $Env:vitamojopassword
-        "x-reporting-key" = $env:vitamojoreportingkey
-        "x-requested-from" = "management"
-    } | ConvertTo-Json
-       
-    $TokenResponse = Invoke-APIRequest -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body
+function Get-VitaMojoAuthenticationToken {     
+    $AuthenticationToken = $null
+
+    # If there is a cached token
+    if ($script:VitaMojoAuthenticationToken) {
+
+        # Get the date/time the cached token expires.
+        $DecodedToken = Get-JwtPayload $script:VitaMojoAuthenticationToken | ConvertFrom-Json
+        $Expiry = Get-Date -UnixTimeSeconds $DecodedToken.exp -AsUTC    
+
+        # If there is at least 2 minutes left before the cached token expires then use it.
+        If ($Expiry -gt (Get-Date -AsUTC).AddMinutes(-2)) {
+            $AuthenticationToken = $script:VitaMojoAuthenticationToken
+        }    
+        else {
+            Write-Host "The Vita Mojo authentication token will expire soon and so a new one will be generated."
+        }     
+    }
     
-    return $TokenResponse.payload.token.value
+    # If there isn't a valid cached authentication token then generate a new one and cache it.
+    if (-Not $AuthenticationToken) {    
+        $Uri = "https://vmos2.vmos.io/user/v1/auth"
+        $Method = "Post"
+        $ContentType = "application/json"
+        $Body = @{
+            "email" = $Env:vitamojousername
+            "password" = $Env:vitamojopassword
+            "x-reporting-key" = $env:vitamojoreportingkey
+            "x-requested-from" = "management"
+        } | ConvertTo-Json
+        
+        $TokenResponse = Invoke-APIRequest -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body                        
+        $AuthenticationToken = $TokenResponse.payload.token.value
+        $script:VitaMojoAuthenticationToken = $AuthenticationToken        
+    }
+
+    return $AuthenticationToken
 }
 
 function Invoke-APIRequest {
