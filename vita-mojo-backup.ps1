@@ -95,14 +95,11 @@ function Invoke-VitaMojoAPIRequest {
         [Parameter(Mandatory)][string] $EndpointName,
         [Parameter(Mandatory)][string] $Method,
         [string] $Body
-    )    
-       
-    $Token = Get-VitaMojoAuthenticationToken
-    $Authorization = $Token 
+    )            
 
-    $Uri = "https://reporting.data.vmos.io/cubejs-api/v1/$($EndpointName)"
+    $Uri = "https://reporting.data.vmos.io/cubejs-api/v1/$EndpointName"
     $Headers = @{
-        "Authorization" = $Authorization
+        "Authorization" = (Get-VitaMojoAuthenticationToken)
         "x-reporting-key" = $env:vitamojoreportingkey
     }
     $ContentType = "application/json"
