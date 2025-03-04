@@ -113,11 +113,9 @@ function Get-AzureStorageAccountContext {
     )
 
     # Connect to Azure as the service principal.
-    if (-not (Get-AzContext)) {
-        $SecretSecureString = $Env:azureserviceprincipalsecret | ConvertTo-SecureString -AsPlainText -Force
-        $Credential = New-Object -TypeName PSCredential -ArgumentList $Env:azureserviceprincipalid, $SecretSecureString    
-        Connect-AzAccount -ServicePrincipal -Credential $Credential -Tenant $Env:azuretenantid -SubscriptionId $Env:azuresubscriptionid > $null
-    }
+    $SecretSecureString = $Env:azureserviceprincipalsecret | ConvertTo-SecureString -AsPlainText -Force
+    $Credential = New-Object -TypeName PSCredential -ArgumentList $Env:azureserviceprincipalid, $SecretSecureString    
+    Connect-AzAccount -ServicePrincipal -Credential $Credential -Tenant $Env:azuretenantid -SubscriptionId $Env:azuresubscriptionid > $null    
 
     # Get the Azure storage account.    
     $StorageAccount = Get-AzStorageAccount -ResourceGroupName $Env:azureresourcegroupname -AccountName $Env:azurestorageaccountname    
@@ -303,9 +301,8 @@ function Copy-TransactionalDataCubeToAzureStorage {
 
     $CubeOutputFolder = $Cube.name
     $TempCubeOutputFolder = "Output/$CubeOutputFolder"
-    
-    $Context = Get-AzureStorageAccountContext  -ContainerName $AzureStorageContainerName
-    $Blobs = Get-AzStorageBlob -Context $Context -Container $AzureStorageContainerName | Where-Object { $_.Name -like "$CubeOutputFolder/*" }
+        
+    $Blobs = Get-AzStorageBlob -Context $AzureStorageAccountContext -Container $AzureStorageContainerName | Where-Object { $_.Name -like "$CubeOutputFolder/*" }
     $SecondLevelFolders = $Blobs | ForEach-Object { ($_.Name -split "/")[1] } | Sort-Object -Unique    
 
     # Get the most recent folder date in the output folder.
