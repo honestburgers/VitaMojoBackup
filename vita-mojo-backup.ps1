@@ -56,8 +56,12 @@ function Invoke-APIRequest {
     $InvokeAttempts = 0
 
     Do {
+        $MaximumInvokeAttempts = 6
+
+        # Exponential back-off after failed requests
         If ($InvokeAttempts -gt 0) {            
-            Start-Sleep -Seconds 5
+            $SleepLength = [math]::Pow(2, $InvokeAttempts - 1)
+            Start-Sleep -Seconds $SleepLength
             Write-Host "Retrying API call to $URI"
         }
 
@@ -67,18 +71,20 @@ function Invoke-APIRequest {
         else {
             $Response = Invoke-RestMethod -Uri $Uri -Method $Method -ContentType $ContentType -Body $Body -StatusCodeVariable "ResponseStatusCode" -SkipHttpErrorCheck
         }
-
+        
         If ($ResponseStatusCode -ge 400) {            
-            Write-Host "API call to $Uri failed. $ResponseStatusCode : $($Response.message)"    
+            Write-Host "API call to $Uri failed. Code = $ResponseStatusCode | Message = $($Response.message)"    
         }        
 
         $InvokeAttempts = $InvokeAttempts + 1
-    }
-    While ($ResponseStatusCode -ge 500 -and $InvokeAttempts -lt 5)
+    }    
+    While ($ResponseStatusCode -ge 500 -and $InvokeAttempts -lt $MaximumInvokeAttempts)     # If a server error is returned then try again
 
-    If ($InvokeAttempts -eq 5) {
-        Write-Host "API call to $Uri failed 5 times. Exiting..."
-        exit 1
+    # If the maximum number of attempts has been reached then throw an exception
+    If ($InvokeAttempts -eq $MaximumInvokeAttempts) {
+        $ErrorMessage = "API call to $Uri failed $MaximumInvokeAttempts times and will not be attempted again."
+        Write-Host $ErrorMessage
+        throw $ErrorMessage
     }
 
     return $Response
