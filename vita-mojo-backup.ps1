@@ -2,7 +2,7 @@ param (
     [string]
     $SelectedCubeName,
     [string]
-    $IncrementalBackupFromDate = "2025-03-02"    
+    $IncrementalBackupFromDate = "2025-03-01"    
 )
 
 function Get-VitaMojoAuthenticationToken {     
@@ -182,7 +182,9 @@ function Copy-FileToAzureStorage {
     & ./azcopy copy $SourceFilename "https://honestarchive.blob.core.windows.net/$DestinationFilePath/?$SASToken" --check-length=false   
 
     If (-Not $?) {
-        throw "Unable to copy file $SourceFilename to Azure blob storage."
+        $ErrorMessage = "Unable to copy file $SourceFilename to Azure blob storage."
+        Write-Host $ErrorMessage
+        throw $ErrorMessage
     }
 
     Write-Host "Data written to Azure blob storage $DestinationFilePath"                    
@@ -204,7 +206,9 @@ function Remove-FolderFromAzureStorage {
     & ./azcopy remove $SourceFilename "https://honestarchive.blob.core.windows.net/$DestinationFolderPath/?$SASToken" --recursive
 
     If (-Not $?) {
-        throw "Unable to remove folder $DestinationFolderPath from Azure blob storage. This must be deleted manually before running the backup again."
+        $ErrorMessage = "Unable to remove folder $DestinationFolderPath from Azure blob storage. This must be deleted manually before running the backup again."
+        Write-Host $ErrorMessage
+        throw $ErrorMessage
     }
 
     Write-Host "Data removed from Azure blob storage $DestinationFolderPath"                    
