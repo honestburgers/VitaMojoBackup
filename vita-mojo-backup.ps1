@@ -2,7 +2,9 @@ param (
     [string]
     $SelectedCubeName,
     [string]
-    $IncrementalBackupFromDate = "2025-03-01"    
+    $IncrementalBackupFromDate = "2025-03-01",
+    [bool]
+    $UseAzureServicePrincipal = $false
 )
 
 function Get-VitaMojoAuthenticationToken {     
@@ -111,11 +113,16 @@ function Get-AzureStorageAccountContext {
     param (        
         [Parameter(Mandatory)][string] $ContainerName        
     )
-
-    # Connect to Azure as the service principal.
-    $SecretSecureString = $Env:azureserviceprincipalsecret | ConvertTo-SecureString -AsPlainText -Force
-    $Credential = New-Object -TypeName PSCredential -ArgumentList $Env:azureserviceprincipalid, $SecretSecureString    
-    Connect-AzAccount -ServicePrincipal -Credential $Credential -Tenant $Env:azuretenantid -SubscriptionId $Env:azuresubscriptionid > $null    
+     
+    # Connect to Azure
+    If ($UseAzureServicePrincipal) {
+        $SecretSecureString = $Env:azureserviceprincipalsecret | ConvertTo-SecureString -AsPlainText -Force
+        $Credential = New-Object -TypeName PSCredential -ArgumentList $Env:azureserviceprincipalid, $SecretSecureString    
+        Connect-AzAccount -ServicePrincipal -Credential $Credential -Tenant $Env:azuretenantid -SubscriptionId $Env:azuresubscriptionid > $null 
+    }
+    else {
+        Connect-AzAccount -Identity -AccountId $Env:azuremanagedidentityclientid > $null
+    }        
 
     # Get the Azure storage account.    
     $StorageAccount = Get-AzStorageAccount -ResourceGroupName $Env:azureresourcegroupname -AccountName $Env:azurestorageaccountname    
