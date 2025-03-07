@@ -186,7 +186,7 @@ function Copy-FileToAzureStorage {
     # Get an Azure storage token    
     $SASToken = Get-AzureStorageContainerSASToken -Context $Context -ContainerName $ContainerName    
 
-    & ./azcopy copy $SourceFilename "https://honestarchive.blob.core.windows.net/$DestinationFilePath/?$SASToken" --check-length=false   
+    & ./azcopy copy $SourceFilename "https://$($Env:azurestorageaccountname).blob.core.windows.net/$DestinationFilePath/?$SASToken" --check-length=false   
 
     If (-Not $?) {
         $ErrorMessage = "Unable to copy file $SourceFilename to Azure blob storage."
@@ -210,7 +210,7 @@ function Remove-FolderFromAzureStorage {
     # Get an Azure storage token    
     $SASToken = Get-AzureStorageContainerSASToken -Context $Context -ContainerName $ContainerName    
 
-    & ./azcopy remove $SourceFilename "https://honestarchive.blob.core.windows.net/$DestinationFolderPath/?$SASToken" --recursive
+    & ./azcopy remove $SourceFilename "https://$($Env:azurestorageaccountname).blob.core.windows.net/$DestinationFolderPath/?$SASToken" --recursive
 
     If (-Not $?) {
         $ErrorMessage = "Unable to remove folder $DestinationFolderPath from Azure blob storage. This must be deleted manually before running the backup again."
