@@ -58,7 +58,7 @@ function Invoke-APIRequest {
     $InvokeAttempts = 0
 
     Do {
-        $MaximumInvokeAttempts = 6
+        $MaximumInvokeAttempts = 10
 
         # Exponential back-off after failed requests
         If ($InvokeAttempts -gt 0) {            
